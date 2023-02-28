@@ -55,23 +55,45 @@
         var sceneToRender = null;
         var createDefaultEngine = function() { return new BABYLON.Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true,  disableWebGL2Support: false}); };
         //---------------------------------------------------|
-//       Simulación de colisión de galaxias          |
+//       Simulación de colisión de "galaxias"        |
 //          (estilo Toomre & Toomre, 1972)           |
 //                                                   |
-//             v0.03      12/112/2022                |
-//             cienzorama@gmail.com                  |
+//             v0.05gv      16/12/2022               |
+//               cienzorama@gmail.com                |
 //---------------------------------------------------|
 
 
+//Cero
 zero=new BABYLON.Vector3(0,0,0);
+
+//Dirección auxiliar
 X=new BABYLON.Vector3(1,0,0);
+
+//Constante gravitacional normalizada
 G=1.0;
+
+//Intervalo temporal de la 
+// integración numérica
 DT=0.01;
+DT0=DT;
+
+//Tamaño de las esferas
+sphere_size=0.05;
+
+//Simulación activada/pausa
 simulation=1;
+
+//Contador global y 
+//de salto de frames
 gcont=0;
 tcont=0;
+
+//Velocidad orbital de los discos
 oc=0.5;
+
+//Auto reinicio
 auto_reset=1;
+
 
 //Estructura de datos de una galaxia
 function _galaxy() {
@@ -91,15 +113,17 @@ function _galaxy() {
     this.n_par=null;
 }
 
+//Lista de galaxias
 galaxies=[];
 n_galaxies=0;
 
+//Consfiguraión inicial
 function init() {
 
     galaxies=[];
     n_galaxies=0;
 
-    var sep=4;
+    var sep=3;
     var velm=1.0;
 
     gitem=new _galaxy();
@@ -119,7 +143,7 @@ function init() {
 
     gitem.color=BABYLON.Color3.FromHSV(360*Math.random(),1,1);
 
-     gitem.normal=new BABYLON.Vector3( (2*Math.random()-1),
+    gitem.normal=new BABYLON.Vector3( (2*Math.random()-1),
                                    (2*Math.random()-1),
                                    (2*Math.random()-1) );
     gitem.normal.normalize();                                   
@@ -155,10 +179,7 @@ function init() {
     n_galaxies++;
 
 
-
-    
-    velm=1;
-
+    //Calcula la velocidad inicial relativa
     var auxv=new BABYLON.Vector3( (2*Math.random()-1),
                                   (2*Math.random()-1),
                                   (2*Math.random()-1) 
@@ -180,35 +201,41 @@ function init() {
     galaxies[1].vel=vel2.scale(velm2*oc);
     
 
-
+    //Generación aleatoria de las partículas de cada galaxia
     if (0) {
 
         for (var k=0;k<n_galaxies;k++) {
 
             for (var i=0;i<galaxies[k].n_par;i++) {
 
+                //Distancia al centro y ángulo 
                 var rad=(Math.random()+0.1)*galaxies[k].size;
                 var ang=Math.random()*Math.PI*2;
 
+                //Vector 1 sobre el disco
                 var dire1=BABYLON.Vector3.Cross(galaxies[k].normal,X);
                 dire1.normalize();
 
+                //Vector 2 en el disco
                 var dire2=BABYLON.Vector3.Cross(galaxies[k].normal,dire1);
                 dire2.normalize();
 
+                //Posición de la partícula sobre el disco
+                //en función de los vectores de dirección 1 y 2
                 var parx=galaxies[k].pos.x+dire1.x*Math.cos(ang)*rad+dire2.x*Math.sin(ang)*rad;
                 var pary=galaxies[k].pos.y+dire1.y*Math.cos(ang)*rad+dire2.y*Math.sin(ang)*rad;
                 var parz=galaxies[k].pos.z+dire1.z*Math.cos(ang)*rad+dire2.z*Math.sin(ang)*rad;
 
-
                 galaxies[k].par_pos[i]=new BABYLON.Vector3(parx,pary,parz);
 
+                //Cálculo de la velocidad orbital respecto al centro del disco
                 var d=BABYLON.Vector3.Distance(galaxies[k].pos,galaxies[k].par_pos[i]);
                 var vr=galaxies[k].par_pos[i].subtract(galaxies[k].pos);
                 vr.normalize();
                 var vv=BABYLON.Vector3.Cross(galaxies[k].normal,vr);
                 var vm=Math.sqrt(G*galaxies[k].mass/d);
 
+                //Se añade la velocidad de traslación del disco
                 var vx=galaxies[k].vel.x+vv.x*vm;
                 var vy=galaxies[k].vel.y+vv.y*vm;
                 var vz=galaxies[k].vel.z+vv.z*vm;
@@ -217,39 +244,46 @@ function init() {
 
                 galaxies[k].par_acc[i]=new BABYLON.Vector3(0,0,0);
 
-
             }
         }
 
     }
 
 
-
+    //Genración ordenada en anillos de las partículas de cada galaxia
+    //estilo Toomre & Toomre
     if (1) {
 
         for (var k=0;k<n_galaxies;k++) {
 
+            //Número de anillos en función del tamaño
             var n_rings=Math.floor(galaxies[k].size*10);
 
+            //Sentido de giro aleatorio
             var sg=1;
             if (Math.random()<0.5) sg=-1;
 
             var cnt=0;
+            //Distancia media entre partículas
             var dsr=galaxies[k].size/n_rings;
 
             for (var ii=0;ii<n_rings;ii++) {
 
+                //Distancia de la partícula al centro del disco
                 var rad=(ii)*dsr+2*dsr;
-
                 rad=galaxies[k].size*Math.pow(ii/(n_rings-1),1.2)+2*dsr;
 
+                //Cálculo del número de partículas por cada anillo
                 var lring=2*Math.PI*rad;
                 var npr=Math.floor(lring/dsr);
 
                 for (jj=0;jj<npr;jj++) {
 
+                    //Ángulo de la partícula en cada anillo
                     var ang=jj*2*Math.PI/npr;
 
+                    //Desplazamiento aleatorio de las 
+                    //partículas plano
                     normal_shake=0.05*0;
                     var nor=new BABYLON.Vector3(0,0,0);
                     nor.copyFrom(galaxies[k].normal);
@@ -262,25 +296,31 @@ function init() {
                     );
                     nor.normalize();
 
+                    //Vector 1 sobre el plano
                     var dire1=BABYLON.Vector3.Cross(nor,X);
                     dire1.normalize();
 
+                    //Vector 2 sobre el plano
                     var dire2=BABYLON.Vector3.Cross(nor,dire1);
                     dire2.normalize();
 
+                    //Posición de la partícula sobre el plano en función
+                    //de los vectores de dirección 1 y 2
                     var parx=galaxies[k].pos.x+dire1.x*Math.cos(ang)*rad+dire2.x*Math.sin(ang)*rad;
                     var pary=galaxies[k].pos.y+dire1.y*Math.cos(ang)*rad+dire2.y*Math.sin(ang)*rad;
                     var parz=galaxies[k].pos.z+dire1.z*Math.cos(ang)*rad+dire2.z*Math.sin(ang)*rad;
 
-
                     galaxies[k].par_pos[cnt]=new BABYLON.Vector3(parx,pary,parz);
 
+                    //Velocidad de rotación de las partículas respecto
+                    //al centro del disco
                     var d=BABYLON.Vector3.Distance(galaxies[k].pos,galaxies[k].par_pos[cnt]);
                     var vr=galaxies[k].par_pos[cnt].subtract(galaxies[k].pos);
                     vr.normalize();
                     var vv=BABYLON.Vector3.Cross(nor,vr);
                     var vm=Math.sqrt(G*galaxies[k].mass/d);
 
+                    //Se suma la velocidad de traslación del disco
                     var vx=galaxies[k].vel.x+vv.x*vm*sg;
                     var vy=galaxies[k].vel.y+vv.y*vm*sg;
                     var vz=galaxies[k].vel.z+vv.z*vm*sg;
@@ -300,26 +340,28 @@ function init() {
 
     }
 
-     var pcm=new BABYLON.Vector3(0,0,0);
-        var total_mass=0;
-        
-        for (var k=0;k<n_galaxies;k++) {
+    //Cálculo del centro de masas
+    var pcm=new BABYLON.Vector3(0,0,0);
+    var total_mass=0;
 
-            pcm.x+=galaxies[k].pos.x*galaxies[k].mass;
-            pcm.y+=galaxies[k].pos.y*galaxies[k].mass;
-            pcm.z+=galaxies[k].pos.z*galaxies[k].mass;
+    for (var k=0;k<n_galaxies;k++) {
 
-            total_mass+=galaxies[k].mass;
+        pcm.x+=galaxies[k].pos.x*galaxies[k].mass;
+        pcm.y+=galaxies[k].pos.y*galaxies[k].mass;
+        pcm.z+=galaxies[k].pos.z*galaxies[k].mass;
+
+        total_mass+=galaxies[k].mass;
+    }
+
+    pcm.scaleInPlace(1/total_mass);
+
+    //Mueve el centro de masas a 0,0,0
+    for (var k=0;k<n_galaxies;k++) {
+        galaxies[k].pos.subtractInPlace(pcm);
+        for (var i=0;i<galaxies[k].n_par;i++) {
+            galaxies[k].par_pos[i].subtractInPlace(pcm);
         }
-
-        pcm.scaleInPlace(1/total_mass);
-
-        for (var k=0;k<n_galaxies;k++) {
-            galaxies[k].pos.subtractInPlace(pcm);
-            for (var i=0;i<galaxies[k].n_par;i++) {
-                galaxies[k].par_pos[i].subtractInPlace(pcm);
-            }
-        }
+    }
 
 }
 
@@ -329,7 +371,7 @@ var createScene = function () {
     scene = new BABYLON.Scene(engine);
     scene.clearColor = new BABYLON.Color3(0.0, 0.0, 0.0);
 
-    //Cámara
+    //Definición de la cámara
     var camera = new BABYLON.ArcRotateCamera("Camera", 0, 0, 10, zero, scene);
     
     camera.position=new BABYLON.Vector3(10,0,0);
@@ -354,22 +396,26 @@ var createScene = function () {
     // Iluminación
     var light = new BABYLON.PointLight("omni", new BABYLON.Vector3(0,50,0), scene);
 
+    //Condiciones iniciales
     init();
 
-
+    //Definición de las partículas de cada galaxia como esferas
+    //de muy pocos polígonos
     for (var k=0;k<n_galaxies;k++) {
 
+        //Material para cada galaxia
         galaxies[k].material=new BABYLON.StandardMaterial("particle material", scene);
         galaxies[k].material.diffuseColor=galaxies[k].color;
         galaxies[k].material.emissiveColor = galaxies[k].color;
         galaxies[k].material.specularColor=new BABYLON.Color3(0,0,0);
 
+        //Creación de las esferas para las partículas
         for (var i=0;i<galaxies[k].n_par;i++) {
 
             galaxies[k].par_mesh[i]= BABYLON.MeshBuilder.CreateSphere(
                                     "particle spheres", 
                                     {segments: 1,
-                                    diameter: 0.05}, 
+                                    diameter: sphere_size}, 
                                     scene);
             galaxies[k].par_mesh[i].position=galaxies[k].par_pos[i];
             galaxies[k].par_mesh[i].material=galaxies[k].material;
@@ -393,7 +439,7 @@ var createScene = function () {
     var al_left=BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
     var al_top=BABYLON.GUI.Control.VERTICAL_ALIGNMENT_TOP;
 
-    //Botón de control de la simulación
+    //Botón de control de pausa/reanudación de la simulación
     var play_btn=BABYLON.GUI.Button.CreateSimpleButton("play/stop",">");
     play_btn.textBlock.text=">";
     play_btn.width="70px";
@@ -433,10 +479,9 @@ var createScene = function () {
         }
         
 	});	
-
     advancedTexture.addControl(play_btn);
 
-    //Botón de reseteo de la simulación
+    //Botón de reinicio de la simulación
     var reset_btn=BABYLON.GUI.Button.CreateSimpleButton("reset","reset");
     reset_btn.textBlock.text="RESET";
     reset_btn.width="70px";
@@ -460,7 +505,7 @@ var createScene = function () {
     advancedTexture.addControl(reset_btn);
 
 
-    //Botón de auto reseteo de la simulación
+    //Botón de auto-reinicio de la simulación
     var areset_btn=BABYLON.GUI.Button.CreateSimpleButton("reset","reset");
     areset_btn.textBlock.text="AUTO RESET";
     areset_btn.width="85px";
@@ -494,7 +539,6 @@ var createScene = function () {
 	});	
     advancedTexture.addControl(areset_btn);
 
-
     //Control de intensidad de efecto glow
     glow_slider = new BABYLON.GUI.Slider();
     glow_slider.minimum = 0;
@@ -514,8 +558,8 @@ var createScene = function () {
     });
     advancedTexture.addControl(glow_slider);
 
-
     //Control de opción colisión/órbita
+    //modifica la velocidad inicial de los discos
     oc_slider = new BABYLON.GUI.Slider();
     oc_slider.minimum = 0;
     oc_slider.maximum = 1.0;
@@ -534,12 +578,31 @@ var createScene = function () {
     });
     advancedTexture.addControl(oc_slider);
 
+    //Control de velocidad de la simulación
+    speed_slider = new BABYLON.GUI.Slider();
+    speed_slider.minimum = 0;
+    speed_slider.maximum = 3*DT0;
+    speed_slider.value = DT;
+    speed_slider.step=0.01*DT0;
+    speed_slider.height = "15px";
+    speed_slider.width = "120px";
+    speed_slider.top="125px";
+    speed_slider.left="140px";
+    speed_slider.background = "gray";
+    speed_slider.color="gray";
+    speed_slider.horizontalAlignment = al_left;
+    speed_slider.verticalAlignment = al_top;			
+    speed_slider.onValueChangedObservable.add(function(value) {
+        DT = speed_slider.value;
+    });
+    advancedTexture.addControl(speed_slider);
 
-    //Texto de datos: distancias
+
+    //Texto de datos
     var opt_text = new BABYLON.GUI.TextBlock();
-    opt_text.text="Glow Intensity\n\n"+"Collision/orbit"
-    opt_text.height="60px";
-    opt_text.width="190px";
+    opt_text.text="Glow Intensity\n\nCollision/orbit\n\nSpeed"
+    opt_text.height="90px";
+    opt_text.width="120px";
     opt_text.color = "white";
     //opt_text.background="black";
     opt_text.fontSize = 14;
@@ -552,16 +615,17 @@ var createScene = function () {
     advancedTexture.addControl(opt_text);
 
 
-
     //---------------END GUI-----------------------------
 
-
+    //Función de reinicio de la simulación
     function reset() {
 
+        //Contador global
         gcont=0;
 
-
+        //Elimina las esferas de las partículas
         for (var k=0;k<n_galaxies;k++) {
+
             galaxies[k].material=null;
 
             for (var i=0;i<galaxies[k].n_par;i++) {
@@ -571,21 +635,25 @@ var createScene = function () {
             }
         }
 
+        //Carga las condiciones iniciales
         init();
 
+        //Vuelve a crear las esferas para las partículas de cada galaxia
         for (var k=0;k<n_galaxies;k++) {
 
+            //Definición del material para cada galaxia
             galaxies[k].material=new BABYLON.StandardMaterial("particle material", scene);
             galaxies[k].material.diffuseColor=galaxies[k].color;
             galaxies[k].material.emissiveColor = galaxies[k].color;
             galaxies[k].material.specularColor=new BABYLON.Color3(0,0,0);
 
+            //Crea la esfera para cada partícula en cada galaxia
             for (var i=0;i<galaxies[k].n_par;i++) {
 
                 galaxies[k].par_mesh[i]= BABYLON.MeshBuilder.CreateSphere(
                                         "particle spheres", 
                                         {segments: 3,
-                                        diameter: 0.05}, 
+                                        diameter: sphere_size}, 
                                         scene);
                 galaxies[k].par_mesh[i].position=galaxies[k].par_pos[i];
                 galaxies[k].par_mesh[i].material=galaxies[k].material;
@@ -597,35 +665,41 @@ var createScene = function () {
     }
 
 
-
+    //Bucle principal de simulación
     scene.registerBeforeRender(function () {
 
+        //Salta algunos frames
         tcont++;
         if (tcont==1) {
             tcont=-1;
             return;
         }
 
+        //Control de pausa/reanudación y
+        //auto-reanudación
         if (simulation==0) {
             return;
         } else {
 
-            if (auto_reset==1) {
+            if (auto_reset==1 && DT!=0) {
                 gcont++;
-                if (gcont>1e3) {
+                if (gcont>800) {
                     reset();
                 }
             }
 
         }
 
+        //Distancia mínima efectiva
         var epsi=0.00001;
 
-        
+        //Actualzación de la posición de los centros de los discos
+        //(Leap-Frog Xn+1/2=Xn+0.5*DT*Vn)
         for (var k=0;k<n_galaxies;k++) {
             galaxies[k].pos.addInPlace( galaxies[k].vel.scale(0.5*DT));
         }
 
+        //Cálculo de la aceleración entre los centros de los discos
         for (var i=0;i<n_galaxies;i++) {
 
             galaxies[i].acc=new BABYLON.Vector3(0,0,0);
@@ -649,20 +723,29 @@ var createScene = function () {
 
         }
 
-         for (var k=0;k<n_galaxies;k++) {
+        //Actualización de la posición y velocidad 
+        // de los centros de los discos
+        // (Leap-Frog  Vn+1=Vn+DT*An
+        //             Xn+1=Xn+1/2+0.5*DT*Vn)
+        for (var k=0;k<n_galaxies;k++) {
             galaxies[k].vel.addInPlace( galaxies[k].acc.scale(DT));
             galaxies[k].pos.addInPlace( galaxies[k].vel.scale(0.5*DT));
         }
         
 
+        //Actualización de la posición de cada partícula del disco
+        // en función de la atracción que que sufre por cada uno 
+        // de los centros
         for (var k=0;k<n_galaxies;k++) {
 
             for (var i=0;i<galaxies[k].n_par;i++) {
 
                 aa=new BABYLON.Vector3(0,0,0);
 
+                //(Leap-Frog Xn+1/2=Xn+0.5*DT*Vn)
                 galaxies[k].par_pos[i].addInPlace(galaxies[k].par_vel[i].scale(0.5*DT));
 
+                //Cálculo de la aceleración
                 for (var h=0;h<n_galaxies;h++) {
 
                     var dx=galaxies[k].par_pos[i].x-galaxies[h].pos.x;
@@ -678,6 +761,8 @@ var createScene = function () {
 
                 }
 
+                // (Leap-Frog  Vn+1=Vn+DT*An
+                //             Xn+1=Xn+1/2+0.5*DT*Vn)
                 galaxies[k].par_vel[i].addInPlace(aa.scale(DT));
                 galaxies[k].par_pos[i].addInPlace(galaxies[k].par_vel[i].scale(0.5*DT));
 
@@ -686,7 +771,7 @@ var createScene = function () {
         }
 
 
-
+        //Cálculo del centro de masas
         var pcm=new BABYLON.Vector3(0,0,0);
         var total_mass=0;
         
@@ -699,6 +784,7 @@ var createScene = function () {
 
         pcm.scaleInPlace(1/total_mass);
 
+        //Mueve el centro de masas a 0,0,0
         for (var k=0;k<n_galaxies;k++) {
             galaxies[k].pos.subtractInPlace(pcm);
             for (var i=0;i<galaxies[k].n_par;i++) {
